@@ -63,15 +63,21 @@ class Menu:
     @staticmethod
     def menu_listpeers(ctx: 'Application') -> int:
         print('Pares Conhecidos:')
-        for peer in ctx.known_peers.values():
-            print(f'\t{peer}')
+        if len(ctx.known_peers) == 0:
+            print('\tNenhum par conhecido.')
+        else:
+            for peer in ctx.known_peers.values():
+                print(f'\t{peer}')
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
     def menu_listfiles(ctx: 'Application') -> int:
         print('Arquivos Disponíveis:')
-        for file in ctx.files:
-            print(f'\t{file}')
+        if len(ctx.files) == 0:
+            print('\tNenhum arquivo disponível.')
+        else:
+            for file in ctx.files:
+                print(f'\t{file}')
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod

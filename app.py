@@ -11,6 +11,7 @@ class Application:
     def __init__(self) -> None:
         self.uid = generate_uid()
         self.known_peers = {}
+        self.files = []
     def run(self) -> None:
         self.menuloop()
     def add_known_peer(self, peer: Peer) -> None:
