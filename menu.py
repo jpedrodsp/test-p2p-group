@@ -107,6 +107,6 @@ class Menu:
     def menu_addpeer_discovery(ctx: 'Application') -> int:
         print('Realizando descoberta de pares...')
         discovered_peer_count: int = 0
-        print(f'{discovered_peer_count} pares descobertos.')
+        print(f'{discovered_peer_count} par(es) descobertos.')
         print('0 - Voltar')
         return Menu.read_option(0, True)
