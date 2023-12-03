@@ -10,6 +10,8 @@ class MenuState(Enum):
     FILELIST = 6
     FILESEARCH = 7
     FILESETDIR = 8
+    PEERADDMANUAL = 9
+    PEERADDDISCOVERY = 10
     
 
 class Menu:
@@ -90,5 +92,21 @@ class Menu:
     def menu_setfiledir(ctx: 'Application') -> int:
         print('Digite o caminho da pasta de arquivos:')
         path = input()
+        print('0 - Voltar')
+        return Menu.read_option(0, True)
+    @staticmethod
+    def menu_addpeer_manual(ctx: 'Application') -> int:
+        print('Digite o IP do par:')
+        peer_ip = input()
+        print('Digite a porta do par:')
+        peer_port = input()
+        # TODO: Implement Manual Peer Addition
+        print('0 - Voltar')
+        return Menu.read_option(0, True)
+    @staticmethod
+    def menu_addpeer_discovery(ctx: 'Application') -> int:
+        print('Realizando descoberta de pares...')
+        discovered_peer_count: int = 0
+        print(f'{discovered_peer_count} pares descobertos.')
         print('0 - Voltar')
         return Menu.read_option(0, True)

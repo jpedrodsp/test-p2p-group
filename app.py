@@ -69,9 +69,9 @@ class Application:
                 if option == 0:
                     state = MenuState.PEERMANAGEMENT
                 elif option == 1:
-                    pass
+                    state = MenuState.PEERADDMANUAL
                 elif option == 2:
-                    pass
+                    state = MenuState.PEERADDDISCOVERY
             elif state == MenuState.PEERREMOVE:
                 option = Menu.menu_removepeer(self)
                 if option == 0:
@@ -88,6 +88,13 @@ class Application:
                 option = Menu.menu_setfiledir(self)
                 if option == 0:
                     state = MenuState.FILEMANAGEMENT
-            
+            elif state == MenuState.PEERADDMANUAL:
+                option = Menu.menu_addpeer_manual(self)
+                if option == 0:
+                    state = MenuState.PEERADD
+            elif state == MenuState.PEERADDDISCOVERY:
+                option = Menu.menu_addpeer_discovery(self)
+                if option == 0:
+                    state = MenuState.PEERADD
             else:
                 raise Exception('Invalid MenuState')
