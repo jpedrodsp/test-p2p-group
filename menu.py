@@ -12,6 +12,7 @@ class MenuState(Enum):
     FILESETDIR = 8
     PEERADDMANUAL = 9
     PEERADDDISCOVERY = 10
+    SYSTEMINFO = 11
     
 
 class Menu:
@@ -31,6 +32,7 @@ class Menu:
     def menu_main(ctx: 'Application') -> int:
         print('1 - Gerenciamento de Pares')
         print('2 - Gerenciamento de Arquivos')
+        print('3 - Informações do Sistema')
         print('0 - Sair')
         return Menu.read_option(2, True)
     @staticmethod
@@ -108,5 +110,15 @@ class Menu:
         print('Realizando descoberta de pares...')
         discovered_peer_count: int = 0
         print(f'{discovered_peer_count} par(es) descobertos.')
+        print('0 - Voltar')
+        return Menu.read_option(0, True)
+    @staticmethod
+    def menu_systeminfo(ctx: 'Application') -> int:
+        print('Informações do Sistema:')
+        print(f'\tID: {ctx.uid}')
+        print(f'\tIP: {ctx.network_address[0]}')
+        print(f'\tPorta: {ctx.network_address[1]}')
+        print(f'\tPares Conhecidos: {len(ctx.known_peers)}')
+        print(f'\tArquivos Disponíveis: {len(ctx.files)}')
         print('0 - Voltar')
         return Menu.read_option(0, True)

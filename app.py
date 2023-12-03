@@ -1,17 +1,43 @@
 from peer import Peer
 from menu import Menu, MenuState
 import uuid
+import threading
 
 MESSAGE_SEPARATOR = b'|||'
 
 def generate_uid() -> str:
     return uuid.uuid4().hex.upper()[:8]
 
+def get_file_dir() -> str:
+    return 'files/'
+
+def get_network_port() -> int:
+    return 50000
+
+def get_network_ip() -> str:
+    return '0.0.0.0'
+
+def get_network_address() -> (str, int):
+    return (get_network_ip(), get_network_port())
+
+def set_network_port(ctx: 'Application', port: int) -> None:
+    previous_address = ctx.network_address
+    ctx.network_address = (previous_address[0], port)
+    
+def set_network_ip(ctx: 'Application', ip: str) -> None:
+    previous_address = ctx.network_address
+    ctx.network_address = (ip, previous_address[1])
+
+def set_network_address(ctx: 'Application', ip: str, port: int) -> None:
+    ctx.network_address = (ip, port)
+
 class Application:
     def __init__(self) -> None:
         self.uid = generate_uid()
         self.known_peers = {}
         self.files = []
+        self.file_dir = get_file_dir()
+        self.network_address = get_network_address()
     def run(self) -> None:
         self.menuloop()
     def add_known_peer(self, peer: Peer) -> None:
@@ -40,6 +66,8 @@ class Application:
                     state = MenuState.PEERMANAGEMENT
                 elif option == 2:
                     state = MenuState.FILEMANAGEMENT
+                elif option == 3:
+                    state = MenuState.SYSTEMINFO
             elif state == MenuState.PEERMANAGEMENT:
                 option = Menu.menu_peermanagement(self)
                 if option == 0:
@@ -96,5 +124,9 @@ class Application:
                 option = Menu.menu_addpeer_discovery(self)
                 if option == 0:
                     state = MenuState.PEERADD
+            elif state == MenuState.SYSTEMINFO:
+                option = Menu.menu_systeminfo(self)
+                if option == 0:
+                    state = MenuState.MAIN
             else:
                 raise Exception('Invalid MenuState')
