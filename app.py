@@ -4,9 +4,10 @@ import uuid
 import threading
 import os
 import time
+import socket, socketserver
 
 MESSAGE_SEPARATOR = b'|||'
-LISTENER_TIMEOUT = 0.1
+LISTENER_TIMEOUT = 2.0
 
 def generate_uid() -> str:
     return uuid.uuid4().hex.upper()[:8]
@@ -15,7 +16,7 @@ def get_file_dir() -> str:
     return 'files/'
 
 def get_network_port() -> int:
-    return 50000
+    return 50002
 
 def get_network_ip() -> str:
     return '0.0.0.0'
@@ -40,8 +41,36 @@ def get_files(ctx: 'Application') -> [str]:
     files = os.listdir(ctx.file_dir)
     return files
 
+def validate_address(host: str, port: int) -> bool:
+    clsck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # clsck.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    clsck.settimeout(LISTENER_TIMEOUT)
+    try:
+        print(f'Validating address {host}:{port}...')
+        clsck.connect((host, port))
+        print(f'Address {host}:{port} is valid.')
+        clsck.sendall(b'HELLO')
+        print('Waiting for response...')
+        data = clsck.recv(1024)
+        if not data:
+            print('No response received.')
+            clsck.close()
+            return False
+        print('Response received.')
+        clsck.close()
+        return True
+    except:
+        print('Address is invalid.')
+        clsck.close()
+        return False
+    
+def log(start: float, msg: str, *args, **kwargs) -> None:
+    end = time.time()
+    print(f'[{end - start:.3f}s] {msg}', *args, **kwargs)
+
 class Application:
     def __init__(self) -> None:
+        self._start = time.time()
         self.uid = generate_uid()
         self.known_peers = {}
         self.file_dir = get_file_dir()
@@ -50,6 +79,9 @@ class Application:
         self._listen = True
         self._listener_thread = threading.Thread(target=self._listener)
         self._listener_thread.start()
+        if validate_address(self.network_address[0], self.network_address[1]) != True:
+            raise Exception('Invalid network address.')
+        log(self._start, 'Application initialized.')
     def run(self) -> None:
         self.menuloop()
         self.stop()
@@ -64,15 +96,36 @@ class Application:
         return self.known_peers[uid]
     def _listener(self) -> None:
         while self._listen == True:
-            time.sleep(LISTENER_TIMEOUT)
-    def handle_message(self, message: bytes) -> None:
+            try:
+                srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                srv.settimeout(LISTENER_TIMEOUT)
+                srv.bind(self.network_address)
+                srv.listen()
+                conn, addr = srv.accept()
+                log(self._start, f'Connected by {addr}')
+                msg = b''
+                data = conn.recv(1024)
+                if not data:
+                    break
+                msg += data
+                self.handle_message(conn, msg)
+                conn.close()
+                srv.close()
+            except socket.timeout:
+                # log(self._start, 'Listener timed out.')
+                srv.close()
+    def handle_message(self, connection: socket.socket, message: bytes) -> None:
+        log(self._start, f'Received message: {message}')
         header = message.split(MESSAGE_SEPARATOR)[0]
         switcher = {
             b'HELLO': self.handle_hello,
         }
-        switcher[header](message)
-    def handle_hello(self, message: bytes) -> None:
-        pass
+        switcher[header](connection, message)
+    def handle_hello(self, connection: socket.socket, message: bytes) -> None:
+        log(self._start, 'Handling HELLO...')
+        msg = b'HELLOBACK'
+        connection.send(msg)
+        log(self._start, 'HELLO handled.')
     def menuloop(self) -> None:
         state: MenuState = MenuState.MAIN
         option: int = 0
