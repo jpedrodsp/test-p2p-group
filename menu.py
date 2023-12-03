@@ -34,7 +34,7 @@ class Menu:
         print('2 - Gerenciamento de Arquivos')
         print('3 - Informações do Sistema')
         print('0 - Sair')
-        return Menu.read_option(2, True)
+        return Menu.read_option(3, True)
     @staticmethod
     def menu_peermanagement(ctx: 'Application') -> int:
         print('1 - Listar Pares')
