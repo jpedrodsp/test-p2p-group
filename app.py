@@ -7,7 +7,7 @@ import time
 import socket, socketserver
 
 MESSAGE_SEPARATOR = b'|||'
-LISTENER_TIMEOUT = 2.0
+LISTENER_TIMEOUT = 1.0
 
 def generate_uid() -> str:
     return uuid.uuid4().hex.upper()[:8]
@@ -16,7 +16,7 @@ def get_file_dir() -> str:
     return 'files/'
 
 def get_network_port() -> int:
-    return 50002
+    return 51000
 
 def get_network_ip() -> str:
     return '0.0.0.0'
@@ -42,16 +42,22 @@ def get_files(ctx: 'Application') -> [str]:
     return files
 
 def validate_address(host: str, port: int) -> bool:
+    """
+    Validates if the given address is valid and available.
+    A valid address can handle the 'HELLO' message.
+    """
     clsck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # clsck.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     clsck.settimeout(LISTENER_TIMEOUT)
     try:
         clsck.connect((host, port))
         clsck.sendall(b'HELLO')
+        rsp = b''
         data = clsck.recv(1024)
         if not data:
-            clsck.close()
-            return False
+            pass
+        rsp += data
+        if rsp != b'HELLOBACK':
+            raise Exception('Invalid response.')
         clsck.close()
         return True
     except:
@@ -73,10 +79,10 @@ class Application:
         self._listen = True
         self._listener_thread = threading.Thread(target=self._listener)
         self._listener_thread.start()
-        if validate_address(self.network_address[0], self.network_address[1]) != True:
-            raise Exception('Already in use or invalid network address.')
         log(self._start, 'Application initialized.')
     def run(self) -> None:
+        if validate_address(self.network_address[0], self.network_address[1]) != True:
+            raise Exception('Already in use or invalid network address.')
         self.menuloop()
         self.stop()
     def stop(self) -> None:
@@ -89,23 +95,23 @@ class Application:
     def get_known_peer(self, uid: str) -> Peer:
         return self.known_peers[uid]
     def _listener(self) -> None:
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.settimeout(LISTENER_TIMEOUT)
+        srv.bind(self.network_address)
+        srv.listen()
         while self._listen == True:
             try:
-                srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                srv.settimeout(LISTENER_TIMEOUT)
-                srv.bind(self.network_address)
-                srv.listen()
                 conn, addr = srv.accept()
                 msg = b''
                 data = conn.recv(1024)
                 if not data:
-                    break
+                    pass
                 msg += data
                 self.handle_message(conn, msg)
                 conn.close()
-                srv.close()
             except socket.timeout:
-                srv.close()
+                pass
+        srv.close()
     def handle_message(self, connection: socket.socket, message: bytes) -> None:
         log(self._start, f'Received message: {message}')
         header = message.split(MESSAGE_SEPARATOR)[0]
