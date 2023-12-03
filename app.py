@@ -46,21 +46,15 @@ def validate_address(host: str, port: int) -> bool:
     # clsck.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     clsck.settimeout(LISTENER_TIMEOUT)
     try:
-        print(f'Validating address {host}:{port}...')
         clsck.connect((host, port))
-        print(f'Address {host}:{port} is valid.')
         clsck.sendall(b'HELLO')
-        print('Waiting for response...')
         data = clsck.recv(1024)
         if not data:
-            print('No response received.')
             clsck.close()
             return False
-        print('Response received.')
         clsck.close()
         return True
     except:
-        print('Address is invalid.')
         clsck.close()
         return False
     
@@ -80,7 +74,7 @@ class Application:
         self._listener_thread = threading.Thread(target=self._listener)
         self._listener_thread.start()
         if validate_address(self.network_address[0], self.network_address[1]) != True:
-            raise Exception('Invalid network address.')
+            raise Exception('Already in use or invalid network address.')
         log(self._start, 'Application initialized.')
     def run(self) -> None:
         self.menuloop()
@@ -102,7 +96,6 @@ class Application:
                 srv.bind(self.network_address)
                 srv.listen()
                 conn, addr = srv.accept()
-                log(self._start, f'Connected by {addr}')
                 msg = b''
                 data = conn.recv(1024)
                 if not data:
@@ -112,7 +105,6 @@ class Application:
                 conn.close()
                 srv.close()
             except socket.timeout:
-                # log(self._start, 'Listener timed out.')
                 srv.close()
     def handle_message(self, connection: socket.socket, message: bytes) -> None:
         log(self._start, f'Received message: {message}')
@@ -122,10 +114,8 @@ class Application:
         }
         switcher[header](connection, message)
     def handle_hello(self, connection: socket.socket, message: bytes) -> None:
-        log(self._start, 'Handling HELLO...')
         msg = b'HELLOBACK'
         connection.send(msg)
-        log(self._start, 'HELLO handled.')
     def menuloop(self) -> None:
         state: MenuState = MenuState.MAIN
         option: int = 0
