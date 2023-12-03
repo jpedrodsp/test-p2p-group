@@ -44,20 +44,49 @@ class Application:
                 if option == 0:
                     state = MenuState.MAIN
                 elif option == 1:
-                    pass
+                    state = MenuState.PEERLIST
                 elif option == 2:
-                    pass
+                    state = MenuState.PEERADD
                 elif option == 3:
-                    pass
+                    state = MenuState.PEERREMOVE
             elif state == MenuState.FILEMANAGEMENT:
                 option = Menu.menu_filemanagement(self)
                 if option == 0:
                     state = MenuState.MAIN
                 elif option == 1:
+                    state = MenuState.FILELIST
+                elif option == 2:
+                    state = MenuState.FILESEARCH
+                elif option == 3:
+                    state = MenuState.FILESETDIR
+            elif state == MenuState.PEERLIST:
+                option = Menu.menu_listpeers(self)
+                if option == 0:
+                    state = MenuState.PEERMANAGEMENT
+            elif state == MenuState.PEERADD:
+                option = Menu.menu_addpeer(self)
+                if option == 0:
+                    state = MenuState.PEERMANAGEMENT
+                elif option == 1:
                     pass
                 elif option == 2:
                     pass
-                elif option == 3:
-                    pass
+            elif state == MenuState.PEERREMOVE:
+                option = Menu.menu_removepeer(self)
+                if option == 0:
+                    state = MenuState.PEERMANAGEMENT
+            elif state == MenuState.FILELIST:
+                option = Menu.menu_listfiles(self)
+                if option == 0:
+                    state = MenuState.FILEMANAGEMENT
+            elif state == MenuState.FILESEARCH:
+                option = Menu.menu_searchfile(self)
+                if option == 0:
+                    state = MenuState.FILEMANAGEMENT
+            elif state == MenuState.FILESETDIR:
+                option = Menu.menu_setfiledir(self)
+                if option == 0:
+                    state = MenuState.FILEMANAGEMENT
+            
             else:
                 raise Exception('Invalid MenuState')
