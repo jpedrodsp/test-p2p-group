@@ -3,8 +3,10 @@ from menu import Menu, MenuState
 import uuid
 import threading
 import os
+import time
 
 MESSAGE_SEPARATOR = b'|||'
+LISTENER_TIMEOUT = 0.1
 
 def generate_uid() -> str:
     return uuid.uuid4().hex.upper()[:8]
@@ -45,14 +47,24 @@ class Application:
         self.file_dir = get_file_dir()
         self.network_address = get_network_address()
         self.files = get_files(self)
+        self._listen = True
+        self._listener_thread = threading.Thread(target=self._listener)
+        self._listener_thread.start()
     def run(self) -> None:
         self.menuloop()
+        self.stop()
+    def stop(self) -> None:
+        self._listen = False
+        self._listener_thread.join()
     def add_known_peer(self, peer: Peer) -> None:
         self.known_peers[peer.uid] = peer
     def remove_known_peer(self, uid: str) -> None:
         del self.known_peers[uid]
     def get_known_peer(self, uid: str) -> Peer:
         return self.known_peers[uid]
+    def _listener(self) -> None:
+        while self._listen == True:
+            time.sleep(LISTENER_TIMEOUT)
     def handle_message(self, message: bytes) -> None:
         header = message.split(MESSAGE_SEPARATOR)[0]
         switcher = {
