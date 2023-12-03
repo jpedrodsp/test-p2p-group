@@ -33,6 +33,8 @@ def set_network_address(ctx: 'Application', ip: str, port: int) -> None:
     ctx.network_address = (ip, port)
     
 def get_files(ctx: 'Application') -> [str]:
+    if not os.path.exists(ctx.file_dir):
+        os.makedirs(ctx.file_dir)
     files = os.listdir(ctx.file_dir)
     return files
 
