@@ -2,6 +2,7 @@ from peer import Peer
 from menu import Menu, MenuState
 import uuid
 import threading
+import os
 
 MESSAGE_SEPARATOR = b'|||'
 
@@ -30,14 +31,18 @@ def set_network_ip(ctx: 'Application', ip: str) -> None:
 
 def set_network_address(ctx: 'Application', ip: str, port: int) -> None:
     ctx.network_address = (ip, port)
+    
+def get_files(ctx: 'Application') -> [str]:
+    files = os.listdir(ctx.file_dir)
+    return files
 
 class Application:
     def __init__(self) -> None:
         self.uid = generate_uid()
         self.known_peers = {}
-        self.files = []
         self.file_dir = get_file_dir()
         self.network_address = get_network_address()
+        self.files = get_files(self)
     def run(self) -> None:
         self.menuloop()
     def add_known_peer(self, peer: Peer) -> None:
