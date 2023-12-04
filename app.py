@@ -4,6 +4,7 @@ import uuid
 import threading
 import os
 import time
+import json
 import socket, socketserver
 from datetime import datetime
 
@@ -190,12 +191,23 @@ class Application:
         switcher = {
             b'HELLO': self.handle_hello,
             b'ADDME': self.handle_addme,
+            b'BROADCASTREQUEST': self.handle_broadcast_request,
         }
         switcher[header](connection, message)
     def handle_hello(self, connection: socket.socket, message: bytes) -> None:
+        """
+        Handles the HELLO message.
+        Hello messages are used to validate if the peer is available.
+        """
         msg = b'HELLOBACK'
         connection.send(msg)
     def handle_addme(self, connection: socket.socket, message: bytes) -> None:
+        """
+        Handles the ADDME message.
+        AddMe messages are used to add a peer to the known peers. The peer must respond with ACK or NACK, depending on the validation result.
+        ACK means the peer was added successfully.
+        NACK means the peer was not added due to validation issues, like NAT or firewall.
+        """
         addr = connection.getpeername()
         client_uid = message.split(MESSAGE_SEPARATOR)[1].decode()
         client_ip = addr[0]
@@ -214,6 +226,20 @@ class Application:
             msg = b'ACK' + MESSAGE_SEPARATOR + self.uid.encode()
             connection.send(msg)
             log(self._start, f'Sent: {msg}')
+    def handle_broadcast_request(self, connection: socket.socket, message: bytes) -> None:
+        """
+        Handles the BROADCASTREQUEST message.
+        BroadcastRequest messages are used to request the known peers list.
+        Response is a BROADCASTRESPONSE message.
+        """
+        my_peers = []
+        for peer in self.known_peers.values():
+            my_peers.append(
+                (peer.uid, peer.ip, peer.port)
+            )
+        peerstr = json.dumps(my_peers)
+        msg = b'BROADCASTRESPONSE' + MESSAGE_SEPARATOR + peerstr.encode()
+        connection.send(msg)
     def manual_peer_add(self, ip: str, port: int) -> bool:
         # Send a ADDME message to the peer.
         # If the peer responds with ACK, add it to the known peers.
@@ -243,6 +269,36 @@ class Application:
         except Exception as e:
             clsck.close()
             return False
+    def broadcast_peer_discovery(self) -> None:
+        """
+        Broadcasts a peer discovery message to all known peers.
+        If a peer responds with ACK, add it to the known peers.
+        """
+        known_peers = self.known_peers.copy()
+        for peer in known_peers.values():
+            clsck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            clsck.settimeout(LISTENER_TIMEOUT)
+            try:
+                clsck.connect((peer.ip, peer.port))
+                msg = b'BROADCASTREQUEST'
+                clsck.sendall(msg)
+                rsp = b''
+                data = clsck.recv(1024)
+                if not data:
+                    pass
+                rsp += data
+                log(self._start, f'Received message: {rsp}')
+                if rsp.split(MESSAGE_SEPARATOR)[0] == b'BROADCASTRESPONSE':
+                    clsck.close()
+                    peer_list = json.loads(rsp.split(MESSAGE_SEPARATOR)[1].decode())
+                    for peer_data in peer_list:
+                        if peer_data[0] not in self.known_peers:
+                            self.manual_peer_add(peer_data[1], peer_data[2])
+            except Exception as e:
+                clsck.close()
+                pass
+        
+            
     def _fileupdate(self) -> None:
         while self._fileupdate_enabled == True:
             self.update_file_list()

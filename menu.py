@@ -152,8 +152,13 @@ class Menu:
     @staticmethod
     def menu_addpeer_discovery(ctx: 'Application') -> int:
         print('Realizando descoberta de pares...')
-        discovered_peer_count: int = 0
-        print(f'{discovered_peer_count} par(es) descobertos.')
+        old_peer_count = len(ctx.known_peers)
+        ctx.broadcast_peer_discovery()
+        new_peer_count = len(ctx.known_peers)
+        if new_peer_count > old_peer_count:
+            print(f'Descoberta de pares concluída: {new_peer_count - old_peer_count} pares encontrados.')
+        else:
+            print('Descoberta de pares concluída. Nenhum par encontrado.')
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
