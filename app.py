@@ -5,6 +5,7 @@ import threading
 import os
 import time
 import socket, socketserver
+from datetime import datetime
 
 MESSAGE_SEPARATOR = b'|||'
 LISTENER_TIMEOUT = 1.0
@@ -18,11 +19,40 @@ def get_file_dir() -> str:
 def get_network_port() -> int:
     return 51000
 
-def get_network_ip() -> str:
+def get_network_host() -> str:
     return '0.0.0.0'
 
+def get_friendly_network_host() -> list:
+    """
+    Return a list of all available IP addresses.
+    
+    Returns:
+    - LAN IP: Obtained by connecting to a broadcast address and retrieving the sender's IP.
+    - Loopback Defined IP: Obtained by resolving the hostname.
+    - Loopback Default IP: Always 127.0.0.1 by default (localhost).
+    """
+    ips = []
+    lan_ip = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.connect(('<broadcast>', 0))
+        lan_ip = s.getsockname()[0]
+        ips.append(lan_ip)
+    except:
+        pass
+    try:
+        loopback_ip = socket.gethostbyname(socket.gethostname())
+        ips.append(loopback_ip)
+    except:
+        pass
+    loopback_main_ip = '127.0.0.1'
+    if loopback_main_ip not in ips:
+        ips.append(loopback_main_ip)
+    return ips
+
 def get_network_address() -> (str, int):
-    return (get_network_ip(), get_network_port())
+    return (get_network_host(), get_network_port())
 
 def set_network_port(ctx: 'Application', port: int) -> None:
     previous_address = ctx.network_address
@@ -63,26 +93,35 @@ def validate_address(host: str, port: int) -> bool:
     except:
         clsck.close()
         return False
-    
+
 def log(start: float, msg: str, *args, **kwargs) -> None:
     end = time.time()
-    print(f'[{end - start:.3f}s] {msg}', *args, **kwargs)
+    content = f'[{end - start:.3f}s] {msg}'
+    with open('log.txt', 'a') as f:
+        f.write(content + '\n')
+    print(content, *args, **kwargs)
 
 class Application:
     def __init__(self) -> None:
         self._start = time.time()
+        log(self._start, '-' * 40)
+        log(self._start, f'Today is {time.strftime("%d/%m/%Y")} at {time.strftime("%H:%M:%S")}')
         self.uid = generate_uid()
         self.known_peers = {}
         self.file_dir = get_file_dir()
         self.network_address = get_network_address()
+        self.friendly_network_host = get_friendly_network_host()
+        log(self._start, f'Network address: {self.network_address[0]}:{self.network_address[1]}')
         self.files = get_files(self)
         self._listen = True
         self._listener_thread = threading.Thread(target=self._listener)
         self._listener_thread.start()
-        log(self._start, 'Application initialized.')
     def run(self) -> None:
+        log(self._start, 'Validating network address.')
         if validate_address(self.network_address[0], self.network_address[1]) != True:
+            log(self._start, 'Could not validate network address.')
             raise Exception('Already in use or invalid network address.')
+        log(self._start, 'Initializing application.')
         self.menuloop()
         self.stop()
     def stop(self) -> None:

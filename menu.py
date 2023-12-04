@@ -116,7 +116,7 @@ class Menu:
     def menu_systeminfo(ctx: 'Application') -> int:
         print('Informações do Sistema:')
         print(f'\tID: {ctx.uid}')
-        print(f'\tIP: {ctx.network_address[0]}')
+        print(f'\tIP: {ctx.friendly_network_host}')
         print(f'\tPorta: {ctx.network_address[1]}')
         print(f'\tPares Conhecidos: {len(ctx.known_peers)}')
         print(f'\tArquivos Disponíveis: {len(ctx.files)}')
