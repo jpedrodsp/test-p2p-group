@@ -17,7 +17,19 @@ def get_file_dir() -> str:
     return 'files/'
 
 def get_network_port() -> int:
-    return 51000
+    starting_ip = 51000
+    actual_ip = starting_ip
+    while True:
+        try:
+            srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            srv.settimeout(LISTENER_TIMEOUT)
+            srv.bind((get_network_host(), actual_ip))
+            srv.close()
+            return actual_ip
+        except:
+            actual_ip += 1
+            if actual_ip >= 52000:
+                raise Exception('Could not find a valid port.')
 
 def get_network_host() -> str:
     return '0.0.0.0'
@@ -156,11 +168,47 @@ class Application:
         header = message.split(MESSAGE_SEPARATOR)[0]
         switcher = {
             b'HELLO': self.handle_hello,
+            b'ADDME': self.handle_addme,
         }
         switcher[header](connection, message)
     def handle_hello(self, connection: socket.socket, message: bytes) -> None:
         msg = b'HELLOBACK'
         connection.send(msg)
+    def handle_addme(self, connection: socket.socket, message: bytes) -> None:
+        addr = connection.getpeername()
+        client_uid = message.split(MESSAGE_SEPARATOR)[1].decode()
+        client_ip = addr[0]
+        client_port = int(message.split(MESSAGE_SEPARATOR)[2].decode())
+        log(self._start, f'Client {client_uid} ({client_ip}:{client_port}) connected. Adding to known peers.')
+        peer = Peer(client_uid, client_ip, client_port)
+        self.add_known_peer(peer)
+        msg = b'ACK' + MESSAGE_SEPARATOR + self.uid.encode()
+        connection.send(msg)
+        log(self._start, f'Sent: {msg}')
+    def manual_peer_add(self, ip: str, port: int) -> bool:
+        # Send a ADDME message to the peer.
+        # If the peer responds with ACK, add it to the known peers.
+        clsck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        clsck.settimeout(LISTENER_TIMEOUT)
+        try:
+            clsck.connect((ip, port))
+            msg = b'ADDME' + MESSAGE_SEPARATOR + self.uid.encode() + MESSAGE_SEPARATOR + str(self.network_address[1]).encode()
+            clsck.sendall(msg)
+            rsp = b''
+            data = clsck.recv(1024)
+            if not data:
+                pass
+            rsp += data
+            if rsp.split(MESSAGE_SEPARATOR)[0] != b'ACK':
+                raise Exception('Invalid response.')
+            clsck.close()
+            uid = rsp.split(MESSAGE_SEPARATOR)[1]
+            peer = Peer(uid, ip, port)
+            self.add_known_peer(peer)
+            return True
+        except Exception as e:
+            clsck.close()
+            return False
     def menuloop(self) -> None:
         state: MenuState = MenuState.MAIN
         option: int = 0

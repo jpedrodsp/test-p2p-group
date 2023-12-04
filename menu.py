@@ -98,11 +98,40 @@ class Menu:
         return Menu.read_option(0, True)
     @staticmethod
     def menu_addpeer_manual(ctx: 'Application') -> int:
-        print('Digite o IP do par:')
-        peer_ip = input()
-        print('Digite a porta do par:')
-        peer_port = input()
-        # TODO: Implement Manual Peer Addition
+        peer_ip: str = ''
+        peer_port: int = 0
+        skip = False
+        if skip != True:
+            while True:
+                print('Digite o IP do par:')
+                peer_ip = input()
+                if peer_ip == '':
+                    skip = True
+                    break
+                break
+        if skip != True:
+            while True:
+                print('Digite a porta do par:')
+                peer_port = input()
+                if peer_port == '':
+                    skip = True
+                    break
+                if peer_port.isnumeric() == False:
+                    print('Porta inválida. Tente novamente.')
+                    continue
+                peer_port = int(peer_port)
+                break
+        
+        if skip != True:
+            res = ctx.manual_peer_add(peer_ip, peer_port)
+            if res == True:
+                print('Par adicionado com sucesso.')
+            else:
+                print('Erro ao adicionar par.')
+        
+        if skip == True:
+            print('Operação cancelada.')
+        
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
