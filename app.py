@@ -192,6 +192,7 @@ class Application:
             b'HELLO': self.handle_hello,
             b'ADDME': self.handle_addme,
             b'BROADCASTREQUEST': self.handle_broadcast_request,
+            b'FILELIST': self.handle_filelist,
         }
         switcher[header](connection, message)
     def handle_hello(self, connection: socket.socket, message: bytes) -> None:
@@ -239,6 +240,15 @@ class Application:
             )
         peerstr = json.dumps(my_peers)
         msg = b'BROADCASTRESPONSE' + MESSAGE_SEPARATOR + peerstr.encode()
+        connection.send(msg)
+    def handle_filelist(self, connection: socket.socket, message: bytes) -> None:
+        """
+        Handles the FILELIST message.
+        FileList messages are used to request the file list.
+        Response is a FILELISTRESPONSE message.
+        """
+        filestr = json.dumps(self.files)
+        msg = b'FILELISTRESPONSE' + MESSAGE_SEPARATOR + self.uid.encode() + MESSAGE_SEPARATOR + filestr.encode()
         connection.send(msg)
     def manual_peer_add(self, ip: str, port: int) -> bool:
         # Send a ADDME message to the peer.
@@ -297,7 +307,34 @@ class Application:
             except Exception as e:
                 clsck.close()
                 pass
-        
+    def list_files_on_network(self) -> dict:
+        """
+        Requests the file list from all known peers.
+        """
+        file_list = {}
+        known_peers = self.known_peers.copy()
+        for peer in known_peers.values():
+            clsck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            clsck.settimeout(LISTENER_TIMEOUT)
+            try:
+                clsck.connect((peer.ip, peer.port))
+                msg = b'FILELIST'
+                clsck.sendall(msg)
+                rsp = b''
+                data = clsck.recv(1024)
+                if not data:
+                    pass
+                rsp += data
+                log(self._start, f'Received message: {rsp}')
+                if rsp.split(MESSAGE_SEPARATOR)[0] == b'FILELISTRESPONSE':
+                    clsck.close()
+                    peer_uid = rsp.split(MESSAGE_SEPARATOR)[1].decode()
+                    peer_file_list = json.loads(rsp.split(MESSAGE_SEPARATOR)[2].decode())
+                    file_list[peer_uid] = peer_file_list
+            except Exception as e:
+                clsck.close()
+                pass
+        return file_list
             
     def _fileupdate(self) -> None:
         while self._fileupdate_enabled == True:
@@ -355,10 +392,12 @@ class Application:
                 if option == 0:
                     state = MenuState.MAIN
                 elif option == 1:
-                    state = MenuState.FILELIST
+                    state = MenuState.FILELISTLOCAL
                 elif option == 2:
-                    state = MenuState.FILESEARCH
+                    state = MenuState.FILELISTREMOTE
                 elif option == 3:
+                    state = MenuState.FILESEARCH
+                elif option == 4:
                     state = MenuState.FILESETDIR
             elif state == MenuState.PEERLIST:
                 option = Menu.menu_listpeers(self)
@@ -376,8 +415,8 @@ class Application:
                 option = Menu.menu_removepeer(self)
                 if option == 0:
                     state = MenuState.PEERMANAGEMENT
-            elif state == MenuState.FILELIST:
-                option = Menu.menu_listfiles(self)
+            elif state == MenuState.FILELISTLOCAL:
+                option = Menu.menu_listlocalfiles(self)
                 if option == 0:
                     state = MenuState.FILEMANAGEMENT
             elif state == MenuState.FILESEARCH:
@@ -404,5 +443,9 @@ class Application:
                 option = Menu.menu_updatepeers(self)
                 if option == 0:
                     state = MenuState.PEERMANAGEMENT
+            elif state == MenuState.FILELISTREMOTE:
+                option = Menu.menu_listremotefiles(self)
+                if option == 0:
+                    state = MenuState.FILEMANAGEMENT
             else:
                 raise Exception('Invalid MenuState')

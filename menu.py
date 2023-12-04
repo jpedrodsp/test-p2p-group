@@ -8,13 +8,14 @@ class MenuState(Enum):
     PEERLIST = 3
     PEERADD = 4
     PEERREMOVE = 5
-    FILELIST = 6
+    FILELISTLOCAL = 6
     FILESEARCH = 7
     FILESETDIR = 8
     PEERADDMANUAL = 9
     PEERADDDISCOVERY = 10
     SYSTEMINFO = 11
     PEERUPDATE = 12
+    FILELISTREMOTE = 13
     
 
 class Menu:
@@ -47,11 +48,12 @@ class Menu:
         return Menu.read_option(4, True)
     @staticmethod
     def menu_filemanagement(ctx: 'Application') -> int:
-        print('1 - Listar Arquivos')
-        print('2 - Buscar Arquivo')
-        print('3 - Definir Pasta de Arquivos')
+        print('1 - Listar Arquivos Locais')
+        print('2 - Listar Arquivos Remotos')
+        print('3 - Buscar Arquivo')
+        print('4 - Definir Pasta de Arquivos')
         print('0 - Voltar')
-        return Menu.read_option(3, True)
+        return Menu.read_option(4, True)
     @staticmethod
     def menu_addpeer(ctx: 'Application') -> int:
         print('1 - Adicionar Par Manualmente')
@@ -78,7 +80,7 @@ class Menu:
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
-    def menu_listfiles(ctx: 'Application') -> int:
+    def menu_listlocalfiles(ctx: 'Application') -> int:
         print('Arquivos Disponíveis:')
         if len(ctx.files) == 0:
             print('\tNenhum arquivo disponível.')
@@ -176,5 +178,21 @@ class Menu:
         print('Atualizando pares...')
         ctx.update_peer_list()
         print('Pares atualizados.')
+        print('0 - Voltar')
+        return Menu.read_option(0, True)
+    @staticmethod
+    def menu_listremotefiles(ctx: 'Application') -> int:
+        print('Buscando arquivos...')
+        if len(ctx.known_peers) == 0:
+            print('Nenhum par conhecido. Impossível buscar arquivos.')
+        else:
+            filemap = ctx.list_files_on_network()
+            for peeruid, files in filemap.items():
+                print(f'Arquivos disponíveis no par {peeruid}:')
+                if len(files) == 0:
+                    print('\tNenhum arquivo disponível.')
+                else:
+                    for file in files:
+                        print(f'\t{file}')
         print('0 - Voltar')
         return Menu.read_option(0, True)
