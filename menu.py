@@ -13,6 +13,7 @@ class MenuState(Enum):
     PEERADDMANUAL = 9
     PEERADDDISCOVERY = 10
     SYSTEMINFO = 11
+    PEERUPDATE = 12
     
 
 class Menu:
@@ -40,8 +41,9 @@ class Menu:
         print('1 - Listar Pares')
         print('2 - Adicionar Par')
         print('3 - Remover Par')
+        print('4 - Atualizar Pares')
         print('0 - Voltar')
-        return Menu.read_option(3, True)
+        return Menu.read_option(4, True)
     @staticmethod
     def menu_filemanagement(ctx: 'Application') -> int:
         print('1 - Listar Arquivos')
@@ -149,5 +151,12 @@ class Menu:
         print(f'\tPorta: {ctx.network_address[1]}')
         print(f'\tPares Conhecidos: {len(ctx.known_peers)}')
         print(f'\tArquivos Disponíveis: {len(ctx.files)}')
+        print('0 - Voltar')
+        return Menu.read_option(0, True)
+    @staticmethod
+    def menu_updatepeers(ctx: 'Application') -> int:
+        print('Atualizando pares...')
+        ctx.update_peer_list()
+        print('Pares atualizados.')
         print('0 - Voltar')
         return Menu.read_option(0, True)

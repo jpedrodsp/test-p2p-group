@@ -9,6 +9,8 @@ from datetime import datetime
 
 MESSAGE_SEPARATOR = b'|||'
 LISTENER_TIMEOUT = 1.0
+PEERUPDATE_TIMEOUT = 2.0
+FILEUPDATE_TIMEOUT = 2.0
 
 def generate_uid() -> str:
     return uuid.uuid4().hex.upper()[:8]
@@ -111,7 +113,7 @@ def log(start: float, msg: str, *args, **kwargs) -> None:
     content = f'[{end - start:.3f}s] {msg}'
     with open('log.txt', 'a') as f:
         f.write(content + '\n')
-    print(content, *args, **kwargs)
+    # print(content, *args, **kwargs)
 
 class Application:
     def __init__(self) -> None:
@@ -119,15 +121,23 @@ class Application:
         log(self._start, '-' * 40)
         log(self._start, f'Today is {time.strftime("%d/%m/%Y")} at {time.strftime("%H:%M:%S")}')
         self.uid = generate_uid()
+        self._knownpeers_lock = threading.Lock()
         self.known_peers = {}
+        self._fileupdate_lock = threading.Lock()
         self.file_dir = get_file_dir()
+        self.update_file_list()
         self.network_address = get_network_address()
         self.friendly_network_host = get_friendly_network_host()
         log(self._start, f'Network address: {self.network_address[0]}:{self.network_address[1]}')
-        self.files = get_files(self)
         self._listen = True
         self._listener_thread = threading.Thread(target=self._listener)
         self._listener_thread.start()
+        self._fileupdate_enabled = True
+        self._fileupdate_thread = threading.Thread(target=self._fileupdate)
+        self._fileupdate_thread.start()
+        self._peerupdate_enabled = True
+        self._peerupdate_thread = threading.Thread(target=self._peerupdate)
+        self._peerupdate_thread.start()
     def run(self) -> None:
         log(self._start, 'Validating network address.')
         if validate_address(self.network_address[0], self.network_address[1]) != True:
@@ -138,13 +148,24 @@ class Application:
         self.stop()
     def stop(self) -> None:
         self._listen = False
+        self._fileupdate_enabled = False
+        self._peerupdate_enabled = False
         self._listener_thread.join()
+        self._fileupdate_thread.join()
+        self._peerupdate_thread.join()
     def add_known_peer(self, peer: Peer) -> None:
+        self._knownpeers_lock.acquire()
         self.known_peers[peer.uid] = peer
+        self._knownpeers_lock.release()
     def remove_known_peer(self, uid: str) -> None:
+        self._knownpeers_lock.acquire()
         del self.known_peers[uid]
+        self._knownpeers_lock.release()
     def get_known_peer(self, uid: str) -> Peer:
-        return self.known_peers[uid]
+        self._knownpeers_lock.acquire()
+        peer = self.known_peers[uid]
+        self._knownpeers_lock.release()
+        return peer
     def _listener(self) -> None:
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.settimeout(LISTENER_TIMEOUT)
@@ -202,13 +223,33 @@ class Application:
             if rsp.split(MESSAGE_SEPARATOR)[0] != b'ACK':
                 raise Exception('Invalid response.')
             clsck.close()
-            uid = rsp.split(MESSAGE_SEPARATOR)[1]
+            uid = rsp.split(MESSAGE_SEPARATOR)[1].decode()
             peer = Peer(uid, ip, port)
             self.add_known_peer(peer)
             return True
         except Exception as e:
             clsck.close()
             return False
+    def _fileupdate(self) -> None:
+        while self._fileupdate_enabled == True:
+            self.update_file_list()
+            time.sleep(FILEUPDATE_TIMEOUT)
+    def _peerupdate(self) -> None:
+        while self._peerupdate_enabled == True:
+            self.update_peer_list()
+            time.sleep(PEERUPDATE_TIMEOUT)
+    def update_peer_list(self) -> None:
+        new_peers = {}
+        self._knownpeers_lock.acquire()
+        for peer in self.known_peers.values():
+            if validate_address(peer.ip, peer.port) == True:
+                new_peers[peer.uid] = peer
+        self.known_peers = new_peers
+        self._knownpeers_lock.release()
+    def update_file_list(self) -> None:
+        self._fileupdate_lock.acquire()
+        self.files = get_files(self)
+        self._fileupdate_lock.release()
     def menuloop(self) -> None:
         state: MenuState = MenuState.MAIN
         option: int = 0
@@ -233,6 +274,8 @@ class Application:
                     state = MenuState.PEERADD
                 elif option == 3:
                     state = MenuState.PEERREMOVE
+                elif option == 4:
+                    state = MenuState.PEERUPDATE
             elif state == MenuState.FILEMANAGEMENT:
                 option = Menu.menu_filemanagement(self)
                 if option == 0:
@@ -283,5 +326,9 @@ class Application:
                 option = Menu.menu_systeminfo(self)
                 if option == 0:
                     state = MenuState.MAIN
+            elif state == MenuState.PEERUPDATE:
+                option = Menu.menu_updatepeers(self)
+                if option == 0:
+                    state = MenuState.PEERMANAGEMENT
             else:
                 raise Exception('Invalid MenuState')
