@@ -200,12 +200,20 @@ class Application:
         client_uid = message.split(MESSAGE_SEPARATOR)[1].decode()
         client_ip = addr[0]
         client_port = int(message.split(MESSAGE_SEPARATOR)[2].decode())
-        log(self._start, f'Client {client_uid} ({client_ip}:{client_port}) connected. Adding to known peers.')
-        peer = Peer(client_uid, client_ip, client_port)
-        self.add_known_peer(peer)
-        msg = b'ACK' + MESSAGE_SEPARATOR + self.uid.encode()
-        connection.send(msg)
-        log(self._start, f'Sent: {msg}')
+        # Try connecting back to prevent NAT issues.
+        res = validate_address(client_ip, client_port)
+        if res != True:
+            log(self._start, f'Client {client_uid} ({client_ip}:{client_port}) could not be validated.')
+            msg = b'NACK'
+            connection.send(msg)
+            log(self._start, f'Sent: {msg}')
+        else:
+            log(self._start, f'Client {client_uid} ({client_ip}:{client_port}) connected. Adding to known peers.')
+            peer = Peer(client_uid, client_ip, client_port)
+            self.add_known_peer(peer)
+            msg = b'ACK' + MESSAGE_SEPARATOR + self.uid.encode()
+            connection.send(msg)
+            log(self._start, f'Sent: {msg}')
     def manual_peer_add(self, ip: str, port: int) -> bool:
         # Send a ADDME message to the peer.
         # If the peer responds with ACK, add it to the known peers.
@@ -220,13 +228,18 @@ class Application:
             if not data:
                 pass
             rsp += data
-            if rsp.split(MESSAGE_SEPARATOR)[0] != b'ACK':
+            log(self._start, f'Received message: {rsp}')
+            if rsp.split(MESSAGE_SEPARATOR)[0] == b'ACK':
+                clsck.close()
+                uid = rsp.split(MESSAGE_SEPARATOR)[1].decode()
+                peer = Peer(uid, ip, port)
+                self.add_known_peer(peer)
+                return True
+            elif rsp.split(MESSAGE_SEPARATOR)[0] == b'NACK':
+                clsck.close()
+                return False
+            else:
                 raise Exception('Invalid response.')
-            clsck.close()
-            uid = rsp.split(MESSAGE_SEPARATOR)[1].decode()
-            peer = Peer(uid, ip, port)
-            self.add_known_peer(peer)
-            return True
         except Exception as e:
             clsck.close()
             return False
@@ -248,6 +261,11 @@ class Application:
         self._knownpeers_lock.release()
     def update_file_list(self) -> None:
         self._fileupdate_lock.acquire()
+        self.files = get_files(self)
+        self._fileupdate_lock.release()
+    def set_file_dir(self, path: str) -> None:
+        self._fileupdate_lock.acquire()
+        self.file_dir = path
         self.files = get_files(self)
         self._fileupdate_lock.release()
     def menuloop(self) -> None:

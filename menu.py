@@ -1,4 +1,5 @@
 from enum import Enum
+import os
 
 class MenuState(Enum):
     MAIN = 0
@@ -94,8 +95,20 @@ class Menu:
         return Menu.read_option(0, True)
     @staticmethod
     def menu_setfiledir(ctx: 'Application') -> int:
+        skip = False
         print('Digite o caminho da pasta de arquivos:')
-        path = input()
+        print(f'Pasta atual: {ctx.file_dir}')
+        path = input(f'Nova pasta: ')
+        if path == '':
+            print('Operação cancelada.')
+            skip = True
+        if skip != True:
+            if os.path.exists(path) == False:
+                print('Pasta não encontrada. Tente novamente.')
+                skip = True
+            else:
+                path = os.path.abspath(path)
+                ctx.set_file_dir(path)
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
