@@ -13,6 +13,7 @@ MESSAGE_SEPARATOR = b'|||'
 LISTENER_TIMEOUT = 1.0
 PEERUPDATE_TIMEOUT = 2.0
 FILEUPDATE_TIMEOUT = 2.0
+NETWORK_BUFFER_SIZE = 1024
 
 def generate_uid() -> str:
     return uuid.uuid4().hex.upper()[:8]
@@ -98,12 +99,15 @@ def validate_address(host: str, port: int) -> bool:
         clsck.connect((host, port))
         clsck.sendall(b'HELLO')
         rsp = b''
-        data = clsck.recv(1024)
-        if not data:
-            pass
-        rsp += data
+        while True:
+            data = clsck.recv(NETWORK_BUFFER_SIZE)
+            rsp += data
+            if len(data) < NETWORK_BUFFER_SIZE:
+                break
         if rsp != b'HELLOBACK':
+            print("Invalid response.")
             raise Exception('Invalid response.')
+        print("Valid response.")
         clsck.close()
         return True
     except:
@@ -115,7 +119,7 @@ def log(start: float, msg: str, *args, **kwargs) -> None:
     content = f'[{end - start:.3f}s] {msg}'
     with open('log.txt', 'a') as f:
         f.write(content + '\n')
-    # print(content, *args, **kwargs)
+    print(content, *args, **kwargs)
 
 class Application:
     def __init__(self) -> None:
@@ -232,10 +236,10 @@ class Application:
                 conn, addr = srv.accept()
                 msg = b''
                 while True:
-                    data = conn.recv(1024)
-                    if not data:
-                        break
+                    data = conn.recv(NETWORK_BUFFER_SIZE)
                     msg += data
+                    if len(data) < NETWORK_BUFFER_SIZE:
+                        break
                 self.handle_message(conn, msg)
                 conn.close()
             except socket.timeout:
@@ -347,10 +351,11 @@ class Application:
             msg = b'ADDME' + MESSAGE_SEPARATOR + self.uid.encode() + MESSAGE_SEPARATOR + str(self.network_address[1]).encode()
             clsck.sendall(msg)
             rsp = b''
-            data = clsck.recv(1024)
-            if not data:
-                pass
-            rsp += data
+            while True:
+                data = clsck.recv(NETWORK_BUFFER_SIZE)
+                rsp += data
+                if len(data) < NETWORK_BUFFER_SIZE:
+                    break
             log(self._start, f'Received message: {rsp}')
             if rsp.split(MESSAGE_SEPARATOR)[0] == b'ACK':
                 clsck.close()
@@ -380,10 +385,11 @@ class Application:
                 msg = b'BROADCASTREQUEST'
                 clsck.sendall(msg)
                 rsp = b''
-                data = clsck.recv(1024)
-                if not data:
-                    pass
-                rsp += data
+                while True:
+                    data = clsck.recv(NETWORK_BUFFER_SIZE)
+                    rsp += data
+                    if len(data) < NETWORK_BUFFER_SIZE:
+                        break
                 log(self._start, f'Received message: {rsp}')
                 if rsp.split(MESSAGE_SEPARATOR)[0] == b'BROADCASTRESPONSE':
                     clsck.close()
@@ -408,10 +414,11 @@ class Application:
                 msg = b'FILELIST'
                 clsck.sendall(msg)
                 rsp = b''
-                data = clsck.recv(1024)
-                if not data:
-                    pass
-                rsp += data
+                while True:
+                    data = clsck.recv(NETWORK_BUFFER_SIZE)
+                    rsp += data
+                    if len(data) < NETWORK_BUFFER_SIZE:
+                        break
                 log(self._start, f'Received message: {rsp}')
                 if rsp.split(MESSAGE_SEPARATOR)[0] == b'FILELISTRESPONSE':
                     clsck.close()
@@ -481,10 +488,10 @@ class Application:
             clsck.sendall(msg)
             rsp = b''
             while True:
-                data = clsck.recv(1024)
-                if not data:
-                    break
+                data = clsck.recv(NETWORK_BUFFER_SIZE)
                 rsp += data
+                if len(data) < NETWORK_BUFFER_SIZE:
+                    break
             log(self._start, f'Received message: len({rsp}), {rsp[:16]}...')
             if rsp.split(MESSAGE_SEPARATOR)[0] == b'FILEGETRESPONSE':
                 if rsp.split(MESSAGE_SEPARATOR)[1] == b'OK':
