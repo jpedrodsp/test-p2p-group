@@ -81,6 +81,7 @@ class Menu:
         return Menu.read_option(0, True)
     @staticmethod
     def menu_listlocalfiles(ctx: 'Application') -> int:
+        print(f'Pasta atual: \"{ctx.file_dir}\"')
         print('Arquivos Disponíveis:')
         if len(ctx.files) == 0:
             print('\tNenhum arquivo disponível.')
@@ -93,6 +94,7 @@ class Menu:
     def menu_receivefilefromnetwork(ctx: 'Application') -> int:
         skip = False
         print('Digite o nome do arquivo desejado:')
+        print(f'Pasta atual: \"{ctx.file_dir}\"')
         filename = input()
         if filename == '':
             skip = True
@@ -116,7 +118,7 @@ class Menu:
     def menu_setfiledir(ctx: 'Application') -> int:
         skip = False
         print('Digite o caminho da pasta de arquivos:')
-        print(f'Pasta atual: {ctx.file_dir}')
+        print(f'Pasta atual: \"{ctx.file_dir}\"')
         path = input(f'Nova pasta: ')
         if path == '':
             print('Operação cancelada.')
@@ -188,6 +190,7 @@ class Menu:
         print(f'\tPorta: {ctx.network_address[1]}')
         print(f'\tPares Conhecidos: {len(ctx.known_peers)}')
         print(f'\tArquivos Disponíveis: {len(ctx.files)}')
+        print(f'\tPasta de Arquivos: \"{ctx.file_dir}\"')
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
