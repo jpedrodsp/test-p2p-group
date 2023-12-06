@@ -105,9 +105,7 @@ def validate_address(host: str, port: int) -> bool:
             if len(data) < NETWORK_BUFFER_SIZE:
                 break
         if rsp != b'HELLOBACK':
-            print("Invalid response.")
             raise Exception('Invalid response.')
-        print("Valid response.")
         clsck.close()
         return True
     except:
