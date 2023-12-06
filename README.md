@@ -3,6 +3,18 @@ This project aims to create a Peer-to-Peer (P2P) application in Python using soc
 
 # Functionalities
 
-[ ] Manage Peers
-[ ] File Exchange: Check file availability on Network
-[ ] File Exchange: Send and Receive Files through Network
+- [x] Manage Peers
+- [x] File Exchange: Check file availability on Network
+- [x] File Exchange: Send and Receive Files through Network
+
+# Getting Started
+
+Pre-requisites
+
+- Install Python 3+
+
+Run on Terminal
+
+```
+python p2p.py
+```
