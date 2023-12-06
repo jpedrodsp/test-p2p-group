@@ -1,3 +1,4 @@
+from base64 import b64decode, b64encode
 from peer import Peer
 from menu import Menu, MenuState
 import uuid
@@ -140,13 +141,19 @@ class Application:
         self._peerupdate_thread = threading.Thread(target=self._peerupdate)
         self._peerupdate_thread.start()
     def run(self) -> None:
-        log(self._start, 'Validating network address.')
-        if validate_address(self.network_address[0], self.network_address[1]) != True:
-            log(self._start, 'Could not validate network address.')
-            raise Exception('Already in use or invalid network address.')
-        log(self._start, 'Initializing application.')
-        self.menuloop()
-        self.stop()
+        try:
+            log(self._start, 'Validating network address.')
+            if validate_address(self.network_address[0], self.network_address[1]) != True:
+                log(self._start, 'Could not validate network address.')
+                raise Exception('Already in use or invalid network address.')
+            log(self._start, 'Initializing application.')
+            self.menuloop()
+            log(self._start, 'Stopping application.')
+            self.stop()
+        except Exception as e:
+            log(self._start, f'Error: {e}')
+            self.stop()
+            raise e
     def stop(self) -> None:
         self._listen = False
         self._fileupdate_enabled = False
@@ -155,19 +162,67 @@ class Application:
         self._fileupdate_thread.join()
         self._peerupdate_thread.join()
     def add_known_peer(self, peer: Peer) -> None:
+        """
+        Add peer to known peers list.
+        
+        It is recommended to use this method instead of directly accessing the known_peers list,
+        due to the thread lock.
+        
+        Parameters:
+        - peer: Peer object to be added.
+        
+        Returns:
+        - None
+        """
         self._knownpeers_lock.acquire()
         self.known_peers[peer.uid] = peer
         self._knownpeers_lock.release()
     def remove_known_peer(self, uid: str) -> None:
+        """
+        Remove peer from known peers list.
+        
+        It is recommended to use this method instead of directly accessing the known_peers list,
+        due to the thread lock.
+        
+        Parameters:
+        - uid: Peer ID to be removed.
+        
+        Returns:
+        - None
+        """
         self._knownpeers_lock.acquire()
         del self.known_peers[uid]
         self._knownpeers_lock.release()
     def get_known_peer(self, uid: str) -> Peer:
+        """
+        Retrieve a peer from the known peers list.
+        
+        It is recommended to use this method instead of directly accessing the known_peers list,
+        due to the thread lock.
+        
+        Parameters:
+        - uid: Peer ID to be retrieved.
+        
+        Returns:
+        - Peer object
+        """
         self._knownpeers_lock.acquire()
         peer = self.known_peers[uid]
         self._knownpeers_lock.release()
         return peer
     def _listener(self) -> None:
+        """
+        Listener thread.
+        
+        The listener thread is responsible for receiving messages from other peers, handling
+        them and responding accordingly. The messages are handled by the handle_message method.
+        
+        Usage:
+        ```
+        listener_thread = threading.Thread(target=self._listener)
+        listener_thread.start()
+        ```
+        """
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.settimeout(LISTENER_TIMEOUT)
         srv.bind(self.network_address)
@@ -176,16 +231,28 @@ class Application:
             try:
                 conn, addr = srv.accept()
                 msg = b''
-                data = conn.recv(1024)
-                if not data:
-                    pass
-                msg += data
+                while True:
+                    data = conn.recv(1024)
+                    if not data:
+                        break
+                    msg += data
                 self.handle_message(conn, msg)
                 conn.close()
             except socket.timeout:
                 pass
         srv.close()
     def handle_message(self, connection: socket.socket, message: bytes) -> None:
+        """
+        Maps the message header to the appropriate handler.
+        Receives a message and calls the appropriate handler.
+        
+        Parameters:
+        - connection: Socket connection object.
+        - message: Message bytes.
+        
+        Returns:
+        - None
+        """
         log(self._start, f'Received message: {message}')
         header = message.split(MESSAGE_SEPARATOR)[0]
         switcher = {
@@ -193,6 +260,7 @@ class Application:
             b'ADDME': self.handle_addme,
             b'BROADCASTREQUEST': self.handle_broadcast_request,
             b'FILELIST': self.handle_filelist,
+            b'FILEGET': self.handle_fileget,
         }
         switcher[header](connection, message)
     def handle_hello(self, connection: socket.socket, message: bytes) -> None:
@@ -250,9 +318,28 @@ class Application:
         filestr = json.dumps(self.files)
         msg = b'FILELISTRESPONSE' + MESSAGE_SEPARATOR + self.uid.encode() + MESSAGE_SEPARATOR + filestr.encode()
         connection.send(msg)
+    def handle_fileget(self, connection: socket.socket, message: bytes) -> None:
+        """
+        Handles the FILEGET message.
+        FileGet messages are used to request a file from the peer.
+        Response is a FILEGETRESPONSE message.
+        """
+        filename = message.split(MESSAGE_SEPARATOR)[1].decode()
+        if filename in self.files:
+            with open(self.file_dir + filename, 'rb') as f:
+                filedata = b64encode(f.read())
+            msg = b'FILEGETRESPONSE' + MESSAGE_SEPARATOR + b'OK' + MESSAGE_SEPARATOR + filedata
+            connection.send(msg)
+        else:
+            msg = b'FILEGETRESPONSE' + MESSAGE_SEPARATOR + b'NOK'
+            connection.send(msg)
     def manual_peer_add(self, ip: str, port: int) -> bool:
-        # Send a ADDME message to the peer.
-        # If the peer responds with ACK, add it to the known peers.
+        """
+        Manually adds a peer to the known peers list.
+        
+        It sends the ADDME message to the peer and waits for the response.
+        If the response is ACK, the peer is added to the known peers list.
+        """
         clsck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         clsck.settimeout(LISTENER_TIMEOUT)
         try:
@@ -337,14 +424,28 @@ class Application:
         return file_list
             
     def _fileupdate(self) -> None:
+        """
+        File Update thread.
+        
+        Updates the file list periodically.
+        """
         while self._fileupdate_enabled == True:
             self.update_file_list()
             time.sleep(FILEUPDATE_TIMEOUT)
     def _peerupdate(self) -> None:
+        """
+        Peer Update thread.
+        
+        Updates the known peers list periodically.
+        """
         while self._peerupdate_enabled == True:
             self.update_peer_list()
             time.sleep(PEERUPDATE_TIMEOUT)
     def update_peer_list(self) -> None:
+        """
+        When called, it will remove all invalid peers from the known peers list.
+        It sends a HELLO message to all known peers and removes the ones that do not respond.
+        """
         new_peers = {}
         self._knownpeers_lock.acquire()
         for peer in self.known_peers.values():
@@ -353,15 +454,58 @@ class Application:
         self.known_peers = new_peers
         self._knownpeers_lock.release()
     def update_file_list(self) -> None:
+        """
+        When called, updates the file list.
+        """
         self._fileupdate_lock.acquire()
         self.files = get_files(self)
         self._fileupdate_lock.release()
     def set_file_dir(self, path: str) -> None:
+        """
+        When called, sets the file directory and updates the file list.
+        """
         self._fileupdate_lock.acquire()
         self.file_dir = path
         self.files = get_files(self)
         self._fileupdate_lock.release()
+    def receive_file_from_network(self, peeruid: str, filename: str) -> None:
+        """
+        When called, receives a file from a peer.
+        """
+        peer = self.get_known_peer(peeruid)
+        clsck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        clsck.settimeout(LISTENER_TIMEOUT)
+        try:
+            clsck.connect((peer.ip, peer.port))
+            msg = b'FILEGET' + MESSAGE_SEPARATOR + filename.encode()
+            clsck.sendall(msg)
+            rsp = b''
+            while True:
+                data = clsck.recv(1024)
+                if not data:
+                    break
+                rsp += data
+            log(self._start, f'Received message: len({rsp}), {rsp[:16]}...')
+            if rsp.split(MESSAGE_SEPARATOR)[0] == b'FILEGETRESPONSE':
+                if rsp.split(MESSAGE_SEPARATOR)[1] == b'OK':
+                    filedata = rsp.split(MESSAGE_SEPARATOR)[2]
+                    with open(os.path.join(self.file_dir, filename), 'wb') as f:
+                        f.write(b64decode(filedata))
+                elif rsp.split(MESSAGE_SEPARATOR)[1] == b'NOK':
+                    raise Exception('File not found.')
+                else:
+                    raise Exception('Invalid response.')
+            else:
+                raise Exception('Invalid response.')
+        except Exception as e:
+            clsck.close()
+            pass
     def menuloop(self) -> None:
+        """
+        Function to handle the menu loop.
+        
+        The menu loop is responsible for handling the menu state machine.
+        """
         state: MenuState = MenuState.MAIN
         option: int = 0
         while True:
@@ -420,7 +564,7 @@ class Application:
                 if option == 0:
                     state = MenuState.FILEMANAGEMENT
             elif state == MenuState.FILESEARCH:
-                option = Menu.menu_searchfile(self)
+                option = Menu.menu_receivefilefromnetwork(self)
                 if option == 0:
                     state = MenuState.FILEMANAGEMENT
             elif state == MenuState.FILESETDIR:

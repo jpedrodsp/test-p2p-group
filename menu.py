@@ -50,7 +50,7 @@ class Menu:
     def menu_filemanagement(ctx: 'Application') -> int:
         print('1 - Listar Arquivos Locais')
         print('2 - Listar Arquivos Remotos')
-        print('3 - Buscar Arquivo')
+        print('3 - Receber Arquivo na Rede')
         print('4 - Definir Pasta de Arquivos')
         print('0 - Voltar')
         return Menu.read_option(4, True)
@@ -90,9 +90,26 @@ class Menu:
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
-    def menu_searchfile(ctx: 'Application') -> int:
+    def menu_receivefilefromnetwork(ctx: 'Application') -> int:
+        skip = False
         print('Digite o nome do arquivo desejado:')
         filename = input()
+        if filename == '':
+            skip = True
+        
+        if skip != True:
+            print("Buscando arquivo na rede...")
+            filemap = ctx.list_files_on_network()
+            found = False
+            for peeruid, files in filemap.items():
+                for file in files:
+                    if file == filename:
+                        found = True
+                        print(f'Arquivo encontrado no par {peeruid}.')
+                        print('Recebendo arquivo...')
+                        ctx.receive_file_from_network(peeruid, filename)
+                        print('Arquivo recebido com sucesso.')
+                
         print('0 - Voltar')
         return Menu.read_option(0, True)
     @staticmethod
