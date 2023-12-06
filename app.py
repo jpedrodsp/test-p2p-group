@@ -119,7 +119,7 @@ def log(start: float, msg: str, *args, **kwargs) -> None:
     content = f'[{end - start:.3f}s] {msg}'
     with open('log.txt', 'a') as f:
         f.write(content + '\n')
-    print(content, *args, **kwargs)
+    # print(content, *args, **kwargs)
 
 class Application:
     def __init__(self) -> None:
